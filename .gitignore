@@ -1,0 +1,27 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache y compilaciones
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Archivos de logs y temporales
+*.log
+temp/
+tmp/

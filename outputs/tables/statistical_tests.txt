@@ -1,0 +1,15 @@
+=== Regresión Logística vs XGBoost ===
+McNemar p-value: 0.000000 (Stat: 281.6092)
+Wilcoxon p-value: 0.001953 (Stat: 0.0000)
+Interpretación: El test de McNemar indica una diferencia estadísticamente significativa (p = 0.0000) en el rendimiento predictivo del conjunto de prueba. El modelo 'XGBoost' superó al otro. El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = 0.0020).
+
+=== Regresión Logística vs G-XGBoost Espacial ===
+McNemar p-value: 0.000000 (Stat: 326.5597)
+Wilcoxon p-value: 0.001953 (Stat: 0.0000)
+Interpretación: El test de McNemar indica una diferencia estadísticamente significativa (p = 0.0000) en el rendimiento predictivo del conjunto de prueba. El modelo 'G-XGBoost Espacial' superó al otro. El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = 0.0020).
+
+=== XGBoost vs G-XGBoost Espacial ===
+McNemar p-value: 0.000054 (Stat: 16.2976)
+Wilcoxon p-value: 0.001953 (Stat: 0.0000)
+Interpretación: El test de McNemar indica una diferencia estadísticamente significativa (p = 0.0001) en el rendimiento predictivo del conjunto de prueba. El modelo 'G-XGBoost Espacial' superó al otro. El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = 0.0020).
+

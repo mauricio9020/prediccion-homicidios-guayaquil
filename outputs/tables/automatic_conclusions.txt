@@ -1,0 +1,3 @@
+El estudio científico indica que el mejor modelo para predecir el mecanismo del homicidio es 'G-XGBoost Espacial' con un Balanced Accuracy de 0.5149 y un ROC AUC de 0.8105.
+El rendimiento de 'G-XGBoost Espacial' supera al peor modelo ('XGBoost') por 6.65% de Balanced Accuracy.
+La variable más importante identificada por ganancia de información es 'Parroquia_SAN FRANCISCO'. El balanceo de clases mediante SMOTE previno el sesgo hacia la clase mayoritaria (Arma de Fuego), incrementando la precisión promedio para Arma Blanca y Otros. La incorporación de variables geográficas (latitud, longitud y parroquia) proporcionó una mejora estadísticamente significativa de la exactitud del modelo espacial G-XGBoost en comparación con su contraparte no espacial.

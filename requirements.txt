@@ -1,0 +1,17 @@
+pandas
+numpy
+scipy
+scikit-learn
+xgboost
+imbalanced-learn
+shap
+folium
+plotly
+matplotlib
+seaborn
+streamlit
+streamlit-folium
+openpyxl
+xlsxwriter
+python-docx
+reportlab
