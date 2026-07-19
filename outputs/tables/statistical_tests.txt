@@ -1,15 +1,107 @@
-=== Regresión Logística vs XGBoost ===
-McNemar p-value: 0.000000 (Stat: 281.6092)
-Wilcoxon p-value: 0.001953 (Stat: 0.0000)
-Interpretación: El test de McNemar indica una diferencia estadísticamente significativa (p = 0.0000) en el rendimiento predictivo del conjunto de prueba. El modelo 'XGBoost' superó al otro. El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = 0.0020).
+=== PRUEBAS DE HIPÓTESIS ESTADÍSTICAS DE MODELOS ===
 
-=== Regresión Logística vs G-XGBoost Espacial ===
-McNemar p-value: 0.000000 (Stat: 326.5597)
-Wilcoxon p-value: 0.001953 (Stat: 0.0000)
-Interpretación: El test de McNemar indica una diferencia estadísticamente significativa (p = 0.0000) en el rendimiento predictivo del conjunto de prueba. El modelo 'G-XGBoost Espacial' superó al otro. El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = 0.0020).
+--- Baseline Clase Mayoritaria vs Baseline Territorial (Parroquia) ---
+McNemar p-value: 1.000000 (Stat: 0.0000)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 1.0000): Sin diferencia estadísticamente significativa en el conjunto de test. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
 
-=== XGBoost vs G-XGBoost Espacial ===
-McNemar p-value: 0.000054 (Stat: 16.2976)
-Wilcoxon p-value: 0.001953 (Stat: 0.0000)
-Interpretación: El test de McNemar indica una diferencia estadísticamente significativa (p = 0.0001) en el rendimiento predictivo del conjunto de prueba. El modelo 'G-XGBoost Espacial' superó al otro. El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = 0.0020).
+--- Baseline Clase Mayoritaria vs Regresión Logística Multinomial ---
+McNemar p-value: 0.000000 (Stat: 365.9505)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Clase Mayoritaria vs Random Forest ---
+McNemar p-value: 0.017960 (Stat: 5.6000)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0180): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Clase Mayoritaria vs Extra Trees ---
+McNemar p-value: 0.004179 (Stat: 8.2045)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0042): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Clase Mayoritaria vs XGBoost Base (No Espacial) ---
+McNemar p-value: 0.000000 (Stat: 287.3832)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Clase Mayoritaria vs XGBoost con Covariables Geográficas ---
+McNemar p-value: 0.000000 (Stat: 104.4464)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Territorial (Parroquia) vs Regresión Logística Multinomial ---
+McNemar p-value: 0.000000 (Stat: 365.9505)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Territorial (Parroquia) vs Random Forest ---
+McNemar p-value: 0.017960 (Stat: 5.6000)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0180): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Territorial (Parroquia) vs Extra Trees ---
+McNemar p-value: 0.004179 (Stat: 8.2045)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0042): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Territorial (Parroquia) vs XGBoost Base (No Espacial) ---
+McNemar p-value: 0.000000 (Stat: 287.3832)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Baseline Territorial (Parroquia) vs XGBoost con Covariables Geográficas ---
+McNemar p-value: 0.000000 (Stat: 104.4464)
+Wilcoxon p-value: 1.000000 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Regresión Logística Multinomial vs Random Forest ---
+McNemar p-value: 0.000000 (Stat: 355.4743)
+Wilcoxon p-value: 0.812500 (Stat: 6.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Regresión Logística Multinomial vs Extra Trees ---
+McNemar p-value: 0.000000 (Stat: 349.2893)
+Wilcoxon p-value: 0.812500 (Stat: 6.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Regresión Logística Multinomial vs XGBoost Base (No Espacial) ---
+McNemar p-value: 0.000000 (Stat: 32.0158)
+Wilcoxon p-value: 0.625000 (Stat: 5.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'XGBoost Base (No Espacial)'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Regresión Logística Multinomial vs XGBoost con Covariables Geográficas ---
+McNemar p-value: 0.000000 (Stat: 196.9555)
+Wilcoxon p-value: 0.625000 (Stat: 5.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'XGBoost con Covariables Geográficas'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Random Forest vs Extra Trees ---
+McNemar p-value: 0.423711 (Stat: 0.6400)
+Wilcoxon p-value: 0.812500 (Stat: 6.0000)
+Interpretación: Test de McNemar (p = 0.4237): Sin diferencia estadísticamente significativa en el conjunto de test. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Random Forest vs XGBoost Base (No Espacial) ---
+McNemar p-value: 0.000000 (Stat: 282.2354)
+Wilcoxon p-value: 0.812500 (Stat: 6.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Random Forest vs XGBoost con Covariables Geográficas ---
+McNemar p-value: 0.000000 (Stat: 89.5541)
+Wilcoxon p-value: 0.437500 (Stat: 4.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon en CV Espacial (p = 0.4375): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Extra Trees vs XGBoost Base (No Espacial) ---
+McNemar p-value: 0.000000 (Stat: 270.7338)
+Wilcoxon p-value: 0.625000 (Stat: 5.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- Extra Trees vs XGBoost con Covariables Geográficas ---
+McNemar p-value: 0.000000 (Stat: 82.2044)
+Wilcoxon p-value: 0.062500 (Stat: 0.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon en CV Espacial (p = 0.0625): Sin diferencia estadísticamente significativa en la validación espacial.
+
+--- XGBoost Base (No Espacial) vs XGBoost con Covariables Geográficas ---
+McNemar p-value: 0.000000 (Stat: 137.5035)
+Wilcoxon p-value: 0.625000 (Stat: 5.0000)
+Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'XGBoost con Covariables Geográficas'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
 

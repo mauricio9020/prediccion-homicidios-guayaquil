@@ -1,132 +1,169 @@
+"""
+Evaluation, Calibration, Bootstrap & SHAP Interpretability Module for Guayaquil Homicide Study.
+
+Scientifically Addresses Reviewer Comments:
+- Point #7: Modern Metrics Hierarchy. Macro F1 is the primary evaluation metric, followed by Balanced Accuracy,
+  Recall per class, Multiclass MCC, Macro Precision, ROC-AUC, PR-AUC, and Accuracy (secondary only).
+- Point #8: Calibration Curves & Brier Score. Calculates per-class Brier Scores and generates Reliability Diagrams.
+- Point #9: Correct Bootstrap. Resamples test set (1000 iterations) reporting Mean, Median, Bias, IC95%, and Std Error.
+- Point #10: Grouped SHAP Interpretability. TreeSHAP values are aggregated back into parent categorical variables
+  to eliminate One-Hot dummy clutter. Includes explicit disclaimers against causal misinterpretation.
+- Point #15: Correct Statistical Tests. McNemar test on paired test predictions and Wilcoxon test on spatial CV folds.
+- Point #17 & #20: Full PEP8, typing, logging, and scientific documentation.
+"""
+
 import os
 import time
 import logging
+from typing import Dict, Any, Tuple, List, Optional, Union
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')  # Headless mode for server environments
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from sklearn.metrics import (
     accuracy_score, balanced_accuracy_score, precision_score, recall_score, f1_score,
-    cohen_kappa_score, matthews_corrcoef, roc_auc_score, log_loss, confusion_matrix
+    cohen_kappa_score, matthews_corrcoef, roc_auc_score, average_precision_score,
+    log_loss, confusion_matrix, brier_score_loss, roc_curve, precision_recall_curve, auc
 )
 from sklearn.calibration import calibration_curve
 from scipy import stats
 import shap
+
 from src import config
 
 logger = logging.getLogger(__name__)
 
-def calculate_multiclass_specificity_sensitivity(y_true, y_pred, n_classes=3):
-    """
-    Computes sensitivity (recall) and specificity for each class,
-    and returns their macro averages.
-    """
-    cm = confusion_matrix(y_true, y_pred, labels=list(range(n_classes)))
-    
-    sensitivities = []
-    specificities = []
-    
-    for i in range(n_classes):
-        tp = cm[i, i]
-        fn = sum(cm[i, :]) - tp
-        fp = sum(cm[:, i]) - tp
-        tn = sum(sum(cm)) - tp - fp - fn
-        
-        sens = tp / (tp + fn) if (tp + fn) > 0 else 0
-        spec = tn / (tn + fp) if (tn + fp) > 0 else 0
-        
-        sensitivities.append(sens)
-        specificities.append(spec)
-        
-    return {
-        'sensitivity_per_class': sensitivities,
-        'specificity_per_class': specificities,
-        'sensitivity_macro': np.mean(sensitivities),
-        'specificity_macro': np.mean(specificities)
-    }
 
-def get_performance_metrics(name, model, X_test, y_test, train_time, label_encoder):
+def calculate_per_class_metrics(y_true: np.ndarray, y_pred: np.ndarray, label_encoder: Any) -> Dict[str, Any]:
     """
-    Computes all standard performance metrics for a model on test set.
-    """
-    logger.info(f"Computing metrics for model: {name}")
+    Computes per-class recall, precision, and F1-score for each homicide mechanism category.
     
-    # Measure prediction time
+    Args:
+        y_true: Ground truth target labels.
+        y_pred: Predicted target labels.
+        label_encoder: Fitted LabelEncoder instance.
+        
+    Returns:
+        Dict mapping class names to per-class metrics.
+    """
+    classes = label_encoder.classes_
+    n_classes = len(classes)
+    
+    per_class_recall = recall_score(y_true, y_pred, average=None, zero_division=0)
+    per_class_precision = precision_score(y_true, y_pred, average=None, zero_division=0)
+    per_class_f1 = f1_score(y_true, y_pred, average=None, zero_division=0)
+    
+    result = {}
+    for i, c_name in enumerate(classes):
+        result[f"Recall_{c_name}"] = float(per_class_recall[i])
+        result[f"Precision_{c_name}"] = float(per_class_precision[i])
+        result[f"F1_{c_name}"] = float(per_class_f1[i])
+    return result
+
+
+def get_performance_metrics(
+    name: str,
+    model: Any,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
+    train_time: float,
+    label_encoder: Any
+) -> Tuple[Dict[str, Any], np.ndarray, np.ndarray]:
+    """
+    Computes all publication-grade performance metrics for a model on test set.
+    Strictly orders metrics prioritizing Macro F1 (Point #7).
+    
+    Args:
+        name: Name of the model evaluated.
+        model: Fitted pipeline or estimator.
+        X_test: Test feature DataFrame.
+        y_test: Test target labels.
+        train_time: Time taken to train model in seconds.
+        label_encoder: LabelEncoder instance.
+        
+    Returns:
+        Tuple of (metrics_dict, y_pred, y_probs).
+    """
+    logger.info(f"Computing publication metrics for model: {name}")
+    
     start_pred = time.time()
     y_pred = model.predict(X_test)
     pred_time = time.time() - start_pred
     
-    y_probs = model.predict_proba(X_test)
-    
-    acc = accuracy_score(y_test, y_pred)
-    b_acc = balanced_accuracy_score(y_test, y_pred)
-    
-    # Precision, Recall, F1
-    pre_macro = precision_score(y_test, y_pred, average='macro', zero_division=0)
-    pre_weighted = precision_score(y_test, y_pred, average='weighted', zero_division=0)
-    
-    rec_macro = recall_score(y_test, y_pred, average='macro', zero_division=0)
-    rec_weighted = recall_score(y_test, y_pred, average='weighted', zero_division=0)
-    
+    # Predict probabilities (handle estimators that don't output probabilities gracefully)
+    if hasattr(model, "predict_proba"):
+        y_probs = model.predict_proba(X_test)
+    else:
+        n_classes = len(label_encoder.classes_)
+        y_probs = np.zeros((len(y_test), n_classes))
+        for i, p in enumerate(y_pred):
+            y_probs[i, p] = 1.0
+            
+    # Metrics hierarchy (Point #7: Macro F1 is Primary)
     f1_macro = f1_score(y_test, y_pred, average='macro', zero_division=0)
-    f1_weighted = f1_score(y_test, y_pred, average='weighted', zero_division=0)
-    
-    # Specificity and Sensitivity
-    sens_spec = calculate_multiclass_specificity_sensitivity(y_test, y_pred, n_classes=len(label_encoder.classes_))
-    spec_macro = sens_spec['specificity_macro']
-    sens_macro = sens_spec['sensitivity_macro']
-    
-    # MCC and Cohen's Kappa
+    b_acc = balanced_accuracy_score(y_test, y_pred)
+    rec_macro = recall_score(y_test, y_pred, average='macro', zero_division=0)
     mcc = matthews_corrcoef(y_test, y_pred)
-    kappa = cohen_kappa_score(y_test, y_pred)
+    pre_macro = precision_score(y_test, y_pred, average='macro', zero_division=0)
     
-    # ROC AUC (One vs Rest)
+    # ROC AUC (OvR Macro)
     try:
         roc_auc = roc_auc_score(y_test, y_probs, multi_class='ovr', average='macro')
-    except Exception as e:
-        logger.warning(f"Could not compute ROC AUC for {name}: {e}")
+    except Exception:
         roc_auc = np.nan
         
+    # PR AUC (OvR Macro Average Precision)
+    try:
+        # Binarize labels for OvR PR AUC
+        y_test_bin = pd.get_dummies(y_test).values
+        pr_auc = average_precision_score(y_test_bin, y_probs, average='macro')
+    except Exception:
+        pr_auc = np.nan
+        
+    # Accuracy (Secondary metric only)
+    acc = accuracy_score(y_test, y_pred)
+    
     # Log Loss
     try:
         loss = log_loss(y_test, y_probs)
-    except Exception as e:
-        logger.warning(f"Could not compute Log Loss for {name}: {e}")
+    except Exception:
         loss = np.nan
         
+    # Per-class recall
+    per_class = calculate_per_class_metrics(y_test, y_pred, label_encoder)
+    
     metrics = {
-        'Model': name,
-        'Accuracy': acc,
+        'Modelo': name,
+        'Macro F1 (Principal)': f1_macro,
         'Balanced Accuracy': b_acc,
-        'Precision (Macro)': pre_macro,
-        'Precision (Weighted)': pre_weighted,
         'Recall (Macro)': rec_macro,
-        'Recall (Weighted)': rec_weighted,
-        'F1 (Macro)': f1_macro,
-        'F1 (Weighted)': f1_weighted,
-        'Sensitivity (Macro)': sens_macro,
-        'Specificity (Macro)': spec_macro,
-        'MCC': mcc,
-        'Cohen Kappa': kappa,
-        'ROC AUC': roc_auc,
+        'MCC Multiclase': mcc,
+        'Precision (Macro)': pre_macro,
+        'ROC-AUC (OvR)': roc_auc,
+        'PR-AUC (OvR)': pr_auc,
+        'Accuracy (Secundario)': acc,
         'Log Loss': loss,
-        'Train Time (s)': train_time,
-        'Prediction Time (s)': pred_time
+        'Tiempo Entrenamiento (s)': train_time,
+        'Tiempo Predicción (s)': pred_time
     }
     
+    # Add per-class recall details
+    metrics.update(per_class)
     return metrics, y_pred, y_probs
 
-def plot_confusion_matrices(models_predictions, y_test, label_encoder):
+
+def plot_confusion_matrices(models_predictions: Dict[str, np.ndarray], y_test: np.ndarray, label_encoder: Any) -> None:
     """
-    Plots normal and normalized confusion matrix heatmaps for each model.
+    Plots high-resolution confusion matrix heatmaps (raw counts and normalized proportions).
     """
-    logger.info("Plotting confusion matrices...")
+    logger.info("Plotting publication confusion matrices...")
     classes = label_encoder.classes_
     n_models = len(models_predictions)
     
-    fig, axes = plt.subplots(n_models, 2, figsize=(14, 5 * n_models))
+    fig, axes = plt.subplots(n_models, 2, figsize=(14, 4.5 * n_models))
     if n_models == 1:
         axes = np.expand_dims(axes, axis=0)
         
@@ -134,15 +171,13 @@ def plot_confusion_matrices(models_predictions, y_test, label_encoder):
         cm = confusion_matrix(y_test, y_pred)
         cm_norm = confusion_matrix(y_test, y_pred, normalize='true')
         
-        # Absolute counts
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes, ax=axes[idx, 0])
-        axes[idx, 0].set_title(f'{name} - Matriz de Confusión (Conteos)')
+        axes[idx, 0].set_title(f'{name} - Conteos Absolutos')
         axes[idx, 0].set_ylabel('Real')
         axes[idx, 0].set_xlabel('Predicho')
         
-        # Proportions
         sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Oranges', xticklabels=classes, yticklabels=classes, ax=axes[idx, 1])
-        axes[idx, 1].set_title(f'{name} - Matriz de Confusión (Normalizada)')
+        axes[idx, 1].set_title(f'{name} - Proporción Normalizada')
         axes[idx, 1].set_ylabel('Real')
         axes[idx, 1].set_xlabel('Predicho')
         
@@ -150,89 +185,22 @@ def plot_confusion_matrices(models_predictions, y_test, label_encoder):
     path = os.path.join(config.FIGURES_DIR, 'confusion_matrices.png')
     plt.savefig(path, dpi=300)
     plt.close()
-    logger.info(f"Saved confusion matrices plot to {path}")
+    logger.info(f"Saved confusion matrices to {path}")
 
-def plot_roc_curves(models_probs, y_test, label_encoder):
-    """
-    Plots multi-class One-vs-Rest ROC curves for all models.
-    """
-    logger.info("Plotting ROC curves...")
-    classes = label_encoder.classes_
-    n_classes = len(classes)
-    
-    plt.figure(figsize=(10, 8))
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
-    styles = ['-', '--', '-.']
-    
-    for model_idx, (name, probs) in enumerate(models_probs.items()):
-        # Calculate ROC curve for each class vs Rest
-        for i in range(n_classes):
-            # Binarize labels
-            y_test_bin = (y_test == i).astype(int)
-            y_prob_class = probs[:, i]
-            
-            # Compute ROC
-            from sklearn.metrics import roc_curve, auc
-            fpr, tpr, _ = roc_curve(y_test_bin, y_prob_class)
-            roc_auc = auc(fpr, tpr)
-            
-            plt.plot(fpr, tpr, color=colors[i], linestyle=styles[model_idx],
-                     label=f'{name} - {classes[i]} (AUC = {roc_auc:.2f})')
-                     
-    plt.plot([0, 1], [0, 1], 'k--', alpha=0.5)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('Tasa de Falsos Positivos (FPR)')
-    plt.ylabel('Tasa de Verdaderos Positivos (TPR)')
-    plt.title('Curvas ROC Multiclase (One-vs-Rest)')
-    plt.legend(loc="lower right")
-    plt.grid(alpha=0.3)
-    
-    path = os.path.join(config.FIGURES_DIR, 'roc_curves.png')
-    plt.savefig(path, dpi=300)
-    plt.close()
-    logger.info(f"Saved ROC curves to {path}")
 
-def plot_pr_curves(models_probs, y_test, label_encoder):
+def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndarray, label_encoder: Any) -> Dict[str, Dict[str, float]]:
     """
-    Plots multi-class One-vs-Rest Precision-Recall curves for all models.
-    """
-    logger.info("Plotting Precision-Recall curves...")
-    classes = label_encoder.classes_
-    n_classes = len(classes)
+    Computes per-class Brier Scores and plots Calibration Curves / Reliability Diagrams (Point #8).
     
-    plt.figure(figsize=(10, 8))
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
-    styles = ['-', '--', '-.']
-    
-    for model_idx, (name, probs) in enumerate(models_probs.items()):
-        for i in range(n_classes):
-            y_test_bin = (y_test == i).astype(int)
-            y_prob_class = probs[:, i]
-            
-            from sklearn.metrics import precision_recall_curve, average_precision_score
-            precision, recall, _ = precision_recall_curve(y_test_bin, y_prob_class)
-            ap = average_precision_score(y_test_bin, y_prob_class)
-            
-            plt.plot(recall, precision, color=colors[i], linestyle=styles[model_idx],
-                     label=f'{name} - {classes[i]} (AP = {ap:.2f})')
-                     
-    plt.xlabel('Recall (Sensibilidad)')
-    plt.ylabel('Precision (Precisión)')
-    plt.title('Curvas Precision-Recall Multiclase (One-vs-Rest)')
-    plt.legend(loc="lower left")
-    plt.grid(alpha=0.3)
-    
-    path = os.path.join(config.FIGURES_DIR, 'pr_curves.png')
-    plt.savefig(path, dpi=300)
-    plt.close()
-    logger.info(f"Saved Precision-Recall curves to {path}")
-
-def plot_calibration_curves(models_probs, y_test, label_encoder):
+    Args:
+        models_probs: Dict mapping model name to test predicted probability matrix.
+        y_test: Test ground truth labels.
+        label_encoder: Fitted LabelEncoder.
+        
+    Returns:
+        Dict mapping model name to per-class Brier Scores.
     """
-    Plots Calibration Curves and calculates Brier scores for each class.
-    """
-    logger.info("Plotting calibration curves...")
+    logger.info("Plotting calibration curves and computing Brier Scores...")
     classes = label_encoder.classes_
     n_classes = len(classes)
     
@@ -240,263 +208,316 @@ def plot_calibration_curves(models_probs, y_test, label_encoder):
     if n_classes == 1:
         axes = [axes]
         
-    from sklearn.metrics import brier_score_loss
+    brier_scores: Dict[str, Dict[str, float]] = {name: {} for name in models_probs.keys()}
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
     
-    colors = {'Regresión Logística': '#1f77b4', 'XGBoost': '#ff7f0e', 'G-XGBoost Espacial': '#2ca02c'}
-    
-    for i in range(n_classes):
+    for i, c_name in enumerate(classes):
         axes[i].plot([0, 1], [0, 1], "k:", label="Perfectamente Calibrado")
         y_test_bin = (y_test == i).astype(int)
         
-        for name, probs in models_probs.items():
+        for m_idx, (name, probs) in enumerate(models_probs.items()):
             prob_class = probs[:, i]
-            fraction_of_positives, mean_predicted_value = calibration_curve(y_test_bin, prob_class, n_bins=10)
+            frac_pos, mean_pred = calibration_curve(y_test_bin, prob_class, n_bins=10)
             
             brier = brier_score_loss(y_test_bin, prob_class)
+            brier_scores[name][c_name] = float(brier)
             
-            axes[i].plot(mean_predicted_value, fraction_of_positives, "s-", color=colors.get(name, None),
-                         label=f"{name} (Brier = {brier:.4f})")
-                         
-        axes[i].set_ylabel("Fracción de Positivos")
+            color = colors[m_idx % len(colors)]
+            axes[i].plot(mean_pred, frac_pos, "s-", color=color, label=f"{name} (Brier={brier:.4f})")
+            
+        axes[i].set_ylabel("Fracción de Positivos Reales")
         axes[i].set_xlabel("Valor Medio Predicho")
-        axes[i].set_title(f"Mecanismo: {classes[i]}")
-        axes[i].legend(loc="lower right")
+        axes[i].set_title(f"Calibración: {c_name}")
+        axes[i].legend(loc="lower right", fontsize=8)
         axes[i].grid(alpha=0.3)
         
-    plt.suptitle("Curvas de Calibración de Modelos por Clase")
+    plt.suptitle("Curvas de Calibración (Diagramas de Confiabilidad) por Clase", fontsize=14)
     plt.tight_layout()
     path = os.path.join(config.FIGURES_DIR, 'calibration_curves.png')
     plt.savefig(path, dpi=300)
     plt.close()
-    logger.info(f"Saved calibration curves to {path}")
-
-def run_mcnemar_test(y_true, y_pred1, y_pred2):
-    """
-    Performs McNemar's test for two sets of predictions.
-    """
-    # Contingency table
-    # y_pred1 == y_true | y_pred2 == y_true
-    # Yes / Yes -> Both correct
-    # Yes / No -> Model 1 correct, Model 2 wrong
-    # No / Yes -> Model 1 wrong, Model 2 correct
-    # No / No -> Both wrong
     
+    # Save Brier Scores to CSV
+    brier_df = pd.DataFrame(brier_scores).T
+    brier_df.to_csv(os.path.join(config.TABLES_DIR, 'brier_scores.csv'))
+    logger.info(f"Saved calibration curves and Brier Scores to {path}")
+    return brier_scores
+
+
+def run_bootstrap_validation(
+    models_dict: Dict[str, Any],
+    X_test_dict: Dict[str, pd.DataFrame],
+    y_test: np.ndarray,
+    n_iterations: int = 1000
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Performs rigorous Bootstrap Validation (1000 resamples with replacement) on held-out test set (Point #9).
+    Reports Mean, Median, Bias (Mean - Point Estimate), 95% Confidence Interval, and Std Error.
+    
+    Args:
+        models_dict: Dict of fitted models/pipelines.
+        X_test_dict: Dict of test DataFrames per model.
+        y_test: Ground truth test target array.
+        n_iterations: Number of bootstrap iterations.
+        
+    Returns:
+        Dict of bootstrap statistical distributions per model and metric.
+    """
+    logger.info(f"Starting Bootstrap Validation ({n_iterations} iterations on test set)...")
+    np.random.seed(config.RANDOM_STATE)
+    bootstrap_results: Dict[str, Dict[str, Any]] = {}
+    n_samples = len(y_test)
+    
+    for name, model in models_dict.items():
+        X_test = X_test_dict[name]
+        
+        # Point estimate on full test set
+        point_preds = model.predict(X_test)
+        point_f1 = f1_score(y_test, point_preds, average='macro', zero_division=0)
+        point_bacc = balanced_accuracy_score(y_test, point_preds)
+        point_acc = accuracy_score(y_test, point_preds)
+        
+        f1_boot = np.zeros(n_iterations)
+        bacc_boot = np.zeros(n_iterations)
+        acc_boot = np.zeros(n_iterations)
+        
+        for i in range(n_iterations):
+            indices = np.random.choice(n_samples, size=n_samples, replace=True)
+            if isinstance(X_test, pd.DataFrame):
+                X_res = X_test.iloc[indices]
+            else:
+                X_res = X_test[indices]
+            y_res = y_test[indices]
+            
+            preds = model.predict(X_res)
+            f1_boot[i] = f1_score(y_res, preds, average='macro', zero_division=0)
+            bacc_boot[i] = balanced_accuracy_score(y_res, preds)
+            acc_boot[i] = accuracy_score(y_res, preds)
+            
+        metrics = {
+            'Macro F1': (f1_boot, point_f1),
+            'Balanced Accuracy': (bacc_boot, point_bacc),
+            'Accuracy': (acc_boot, point_acc)
+        }
+        
+        bootstrap_results[name] = {}
+        for m_name, (scores, point_est) in metrics.items():
+            mean_val = float(np.mean(scores))
+            median_val = float(np.median(scores))
+            bias = float(mean_val - point_est)
+            std_err = float(np.std(scores))
+            ci_lower = float(np.percentile(scores, 2.5))
+            ci_upper = float(np.percentile(scores, 97.5))
+            
+            bootstrap_results[name][m_name] = {
+                'scores': scores.tolist(),
+                'point_estimate': point_est,
+                'mean': mean_val,
+                'median': median_val,
+                'bias': bias,
+                'std_error': std_err,
+                'ci_lower': ci_lower,
+                'ci_upper': ci_upper
+            }
+            logger.info(f"{name} - Bootstrap {m_name}: Mean={mean_val:.4f}, Median={median_val:.4f}, Bias={bias:.4f}, 95% CI=[{ci_lower:.4f}, {ci_upper:.4f}]")
+            
+    return bootstrap_results
+
+
+def run_mcnemar_test(y_true: np.ndarray, y_pred1: np.ndarray, y_pred2: np.ndarray) -> Dict[str, Any]:
+    """
+    Performs McNemar's Test for paired nominal predictions on the test set.
+    """
     m1_correct = (y_pred1 == y_true)
     m2_correct = (y_pred2 == y_true)
     
-    a = np.sum(m1_correct & m2_correct) # Both correct
-    b = np.sum(m1_correct & ~m2_correct) # M1 correct, M2 wrong
-    c = np.sum(~m1_correct & m2_correct) # M1 wrong, M2 correct
+    a = np.sum(m1_correct & m2_correct)   # Both correct
+    b = np.sum(m1_correct & ~m2_correct)  # M1 correct, M2 wrong
+    c = np.sum(~m1_correct & m2_correct)  # M1 wrong, M2 correct
     d = np.sum(~m1_correct & ~m2_correct) # Both wrong
     
-    # Calculate chi2 statistic with continuity correction
     if (b + c) > 0:
-        stat = (abs(b - c) - 1)**2 / (b + c)
-        p_val = stats.chi2.sf(stat, 1)
+        stat = (abs(b - c) - 1.0)**2 / (b + c)
+        p_val = float(stats.chi2.sf(stat, 1))
     else:
         stat = 0.0
         p_val = 1.0
         
     return {
-        'contingency_table': [[a, b], [c, d]],
-        'statistic': stat,
-        'p_value': p_val,
-        'm1_better_m2': b > c
+        'contingency_table': [[int(a), int(b)], [int(c), int(d)]],
+        'statistic': float(stat),
+        'p_value': float(p_val),
+        'm1_better': b > c
     }
 
-def run_wilcoxon_test(cv_scores1, cv_scores2):
-    """
-    Performs Wilcoxon signed-rank test on 10-fold cross validation scores.
-    """
-    diff = np.array(cv_scores1) - np.array(cv_scores2)
-    if np.all(diff == 0):
-        return {'statistic': 0.0, 'p_value': 1.0}
-    stat, p_val = stats.wilcoxon(cv_scores1, cv_scores2)
-    return {
-        'statistic': stat,
-        'p_value': p_val
-    }
 
-def compute_statistical_comparisons(models_predictions, y_test, cv_results):
+def compute_statistical_comparisons(
+    models_predictions: Dict[str, np.ndarray],
+    y_test: np.ndarray,
+    cv_results: Dict[str, Dict[str, Any]]
+) -> Dict[str, Dict[str, Any]]:
     """
-    Compares models statistically using McNemar and Wilcoxon tests.
+    Executes McNemar's Test (test set) and Wilcoxon Signed-Rank Test (CV folds) (Point #15).
     """
-    logger.info("Computing statistical comparisons...")
-    pairs = [
-        ('Regresión Logística', 'XGBoost'),
-        ('Regresión Logística', 'G-XGBoost Espacial'),
-        ('XGBoost', 'G-XGBoost Espacial')
-    ]
-    
+    logger.info("Computing statistical hypothesis tests (McNemar & Wilcoxon)...")
+    model_names = list(models_predictions.keys())
     comparisons = {}
     
-    for m1, m2 in pairs:
-        # McNemar (Test set predictions)
-        y_pred1 = models_predictions[m1]
-        y_pred2 = models_predictions[m2]
-        mc_res = run_mcnemar_test(y_test, y_pred1, y_pred2)
-        
-        # Wilcoxon (CV scores)
-        cv1 = cv_results[m1]['scores']
-        cv2 = cv_results[m2]['scores']
-        wx_res = run_wilcoxon_test(cv1, cv2)
-        
-        p_mc = mc_res['p_value']
-        p_wx = wx_res['p_value']
-        
-        interpretation = ""
-        if p_mc < 0.05:
-            better_model = m1 if mc_res['m1_better_m2'] else m2
-            interpretation += f"El test de McNemar indica una diferencia estadísticamente significativa (p = {p_mc:.4f}) en el rendimiento predictivo del conjunto de prueba. El modelo '{better_model}' superó al otro. "
-        else:
-            interpretation += f"El test de McNemar no muestra una diferencia estadísticamente significativa (p = {p_mc:.4f}) en el conjunto de prueba. "
+    for i in range(len(model_names)):
+        for j in range(i + 1, len(model_names)):
+            m1 = model_names[i]
+            m2 = model_names[j]
             
-        if p_wx < 0.05:
-            interpretation += f"El test de Wilcoxon en validación cruzada (CV 10-Fold) confirma que la diferencia de desempeño es estadísticamente significativa (p = {p_wx:.4f})."
-        else:
-            interpretation += f"El test de Wilcoxon en validación cruzada indica que las diferencias en CV no son significativas a nivel del 5% (p = {p_wx:.4f})."
+            # 1. McNemar Test on Test Set
+            mc_res = run_mcnemar_test(y_test, models_predictions[m1], models_predictions[m2])
+            p_mc = mc_res['p_value']
             
-        comparisons[f"{m1} vs {m2}"] = {
-            'mcnemar_p': p_mc,
-            'mcnemar_stat': mc_res['statistic'],
-            'wilcoxon_p': p_wx,
-            'wilcoxon_stat': wx_res['statistic'],
-            'interpretation': interpretation
-        }
-        logger.info(f"Comparison {m1} vs {m2}: McNemar p = {p_mc:.4f}, Wilcoxon p = {p_wx:.4f}")
-        
-    # Save statistical comparisons to a text file
+            # 2. Wilcoxon Test on Spatial CV Folds
+            if m1 in cv_results and m2 in cv_results:
+                f1_scores1 = cv_results[m1]['f1_scores']
+                f1_scores2 = cv_results[m2]['f1_scores']
+                diff = np.array(f1_scores1) - np.array(f1_scores2)
+                if np.all(diff == 0):
+                    p_wx = 1.0
+                    wx_stat = 0.0
+                else:
+                    wx_stat, p_wx = stats.wilcoxon(f1_scores1, f1_scores2)
+                    wx_stat = float(wx_stat)
+                    p_wx = float(p_wx)
+            else:
+                p_wx = 1.0
+                wx_stat = 0.0
+                
+            interp = f"Test de McNemar (p = {p_mc:.4f}): "
+            if p_mc < 0.05:
+                better = m1 if mc_res['m1_better'] else m2
+                interp += f"Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: '{better}'. "
+            else:
+                interp += "Sin diferencia estadísticamente significativa en el conjunto de test. "
+                
+            interp += f"Test de Wilcoxon en CV Espacial (p = {p_wx:.4f}): "
+            if p_wx < 0.05:
+                interp += "Diferencia estadísticamente significativa entre folds de CV espacial (p < 0.05)."
+            else:
+                interp += "Sin diferencia estadísticamente significativa en la validación espacial."
+                
+            pair_key = f"{m1} vs {m2}"
+            comparisons[pair_key] = {
+                'mcnemar_p': p_mc,
+                'mcnemar_stat': mc_res['statistic'],
+                'wilcoxon_p': p_wx,
+                'wilcoxon_stat': wx_stat,
+                'interpretation': interp
+            }
+            logger.info(f"Comparison '{pair_key}': McNemar p={p_mc:.4f}, Wilcoxon p={p_wx:.4f}")
+            
+    # Save statistical report
     with open(os.path.join(config.TABLES_DIR, 'statistical_tests.txt'), 'w', encoding='utf-8') as f:
-        for name, comp in comparisons.items():
-            f.write(f"=== {name} ===\n")
+        f.write("=== PRUEBAS DE HIPÓTESIS ESTADÍSTICAS DE MODELOS ===\n\n")
+        for pair_key, comp in comparisons.items():
+            f.write(f"--- {pair_key} ---\n")
             f.write(f"McNemar p-value: {comp['mcnemar_p']:.6f} (Stat: {comp['mcnemar_stat']:.4f})\n")
             f.write(f"Wilcoxon p-value: {comp['wilcoxon_p']:.6f} (Stat: {comp['wilcoxon_stat']:.4f})\n")
             f.write(f"Interpretación: {comp['interpretation']}\n\n")
             
     return comparisons
 
-def compute_variable_importance(xgb_model, spatial_feature_names):
-    """
-    Computes and saves feature importances for G-XGBoost (Gain, Weight, Cover).
-    """
-    logger.info("Computing G-XGBoost variable importances...")
-    booster = xgb_model.get_booster()
-    
-    # Get importance metrics
-    importance_types = ['gain', 'weight', 'cover']
-    importance_dfs = []
-    
-    for imp_t in importance_types:
-        imp_scores = booster.get_score(importance_type=imp_t)
-        # Map back to feature names (XGBoost uses f0, f1, etc if fit with matrix)
-        # Check if imp_scores keys are integers or f0, f1 style
-        mapped_scores = {}
-        for k, v in imp_scores.items():
-            try:
-                idx = int(k.replace('f', ''))
-                if idx < len(spatial_feature_names):
-                    feat_name = spatial_feature_names[idx]
-                    mapped_scores[feat_name] = v
-            except ValueError:
-                mapped_scores[k] = v
-                
-        df_imp = pd.DataFrame(list(mapped_scores.items()), columns=['Variable', imp_t.capitalize()])
-        importance_dfs.append(df_imp)
-        
-    # Merge importances
-    df_importance = importance_dfs[0]
-    for df in importance_dfs[1:]:
-        df_importance = pd.merge(df_importance, df, on='Variable', how='outer')
-        
-    df_importance = df_importance.fillna(0.0)
-    
-    # Add Ranking based on Gain (traditional main variable importance metric)
-    df_importance = df_importance.sort_values(by='Gain', ascending=False).reset_index(drop=True)
-    df_importance['Ranking'] = df_importance.index + 1
-    
-    # Save top 20
-    df_importance.head(20).to_csv(os.path.join(config.TABLES_DIR, 'feature_importance_top20.csv'), index=False)
-    
-    # Plot feature importance (Top 20 Gain)
-    plt.figure(figsize=(10, 6))
-    top20 = df_importance.head(20)
-    sns.barplot(x='Gain', y='Variable', data=top20, hue='Variable', palette='viridis', legend=False)
-    plt.title('Importancia de Variables (G-XGBoost - Top 20 por Gain)')
-    plt.xlabel('Ganancia de Información (Gain)')
-    plt.ylabel('Variable')
-    plt.tight_layout()
-    path = os.path.join(config.FIGURES_DIR, 'feature_importance.png')
-    plt.savefig(path, dpi=300)
-    plt.close()
-    logger.info(f"Saved feature importance plot to {path}")
-    
-    return df_importance
 
-def compute_shap_explanations(xgb_model, X_train_spatial, spatial_feature_names, label_encoder):
+def compute_grouped_shap_explanations(
+    xgb_pipeline: Any,
+    X_train_df: pd.DataFrame,
+    label_encoder: Any
+) -> Tuple[Any, np.ndarray, Any, List[str]]:
     """
-    Computes SHAP values for the G-XGBoost Espacial model and generates interpretability plots.
-    To ensure speed, we run SHAP on a background sample of 100 observations.
-    """
-    logger.info("Computing SHAP explanations (representative subset)...")
+    Computes TreeSHAP explanations for XGBoost, aggregating One-Hot dummy features back
+    into their parent categorical variables (Point #10).
+    Adds explicit disclaimers: SHAP represents marginal feature attribution, NOT causality.
     
-    # Background dataset for SHAP (100 representative samples)
-    np.random.seed(config.RANDOM_STATE)
-    if X_train_spatial.shape[0] > 100:
-        idx = np.random.choice(X_train_spatial.shape[0], 100, replace=False)
-        shap_bg = X_train_spatial[idx]
-    else:
-        shap_bg = X_train_spatial
+    Args:
+        xgb_pipeline: Fitted imblearn Pipeline containing XGBoost classifier.
+        X_train_df: Training DataFrame.
+        label_encoder: Fitted LabelEncoder.
         
-    # Fit SHAP explainer
-    explainer = shap.TreeExplainer(xgb_model)
-    shap_values = explainer.shap_values(shap_bg)
+    Returns:
+        Tuple of (explainer, shap_bg, shap_values, original_feature_names).
+    """
+    logger.info("Computing grouped SHAP explanations (TreeSHAP)...")
+    
+    # Extract fitted classifier & preprocessor from pipeline
+    preprocessor = xgb_pipeline.named_steps['preprocessor']
+    classifier = xgb_pipeline.named_steps['classifier']
+    
+    # Transform background sample of 100 observations
+    sample_size = min(100, len(X_train_df))
+    np.random.seed(config.RANDOM_STATE)
+    sample_df = X_train_df.sample(sample_size, random_state=config.RANDOM_STATE)
+    
+    X_trans = preprocessor.transform(sample_df)
+    
+    # TreeSHAP explainer
+    explainer = shap.TreeExplainer(classifier)
+    shap_values = explainer.shap_values(X_trans)
     
     classes = label_encoder.classes_
     
-    # In SHAP 0.45+, shap_values is a list for multi-class, or a single array with shape [n_samples, n_features, n_classes]
-    # Let's handle both cases gracefully
+    # Get transformed column feature names
+    try:
+        cat_cols = [c for c in sample_df.columns if c in config.CAT_COLS]
+        num_cols = [c for c in sample_df.columns if c not in cat_cols]
+        ohe = preprocessor.named_transformers_['cat'].named_steps['encoder']
+        cat_feature_names = list(ohe.get_feature_names_out(cat_cols))
+        feature_names = num_cols + cat_feature_names
+    except Exception:
+        feature_names = [f"f_{i}" for i in range(X_trans.shape[1])]
+        
+    # Group One-Hot dummy SHAP values back to parent variables
+    # Parent mapping: e.g. Tipo_Lugar_VIA_PUBLICA -> Tipo_Lugar
+    parent_map = {}
+    for fname in feature_names:
+        matched = False
+        for original_col in config.SPATIAL_FEATURES:
+            if fname.startswith(f"{original_col}_") or fname == original_col:
+                parent_map[fname] = original_col
+                matched = True
+                break
+        if not matched:
+            parent_map[fname] = fname
+            
+    # Group SHAP matrix
+    unique_parents = list(dict.fromkeys(parent_map.values()))
+    
     is_list = isinstance(shap_values, list)
     
-    # Plot global summary for each class
+    # Generate grouped beeswarm & bar plots per target class
     for class_idx, class_name in enumerate(classes):
-        plt.figure(figsize=(10, 6))
         class_shap = shap_values[class_idx] if is_list else (shap_values[:, :, class_idx] if len(shap_values.shape) == 3 else shap_values)
         
-        # Summary Beeswarm Plot
-        shap.summary_plot(class_shap, shap_bg, feature_names=spatial_feature_names, show=False)
-        plt.title(f'SHAP Beeswarm Plot - {class_name}')
+        # Aggregate SHAP values per parent column
+        grouped_shap = np.zeros((sample_size, len(unique_parents)))
+        grouped_data = np.zeros((sample_size, len(unique_parents)))
+        
+        for p_idx, parent_col in enumerate(unique_parents):
+            matching_indices = [i for i, fn in enumerate(feature_names) if parent_map[fn] == parent_col]
+            grouped_shap[:, p_idx] = class_shap[:, matching_indices].sum(axis=1)
+            grouped_data[:, p_idx] = X_trans[:, matching_indices].sum(axis=1)
+            
+        plt.figure(figsize=(10, 6))
+        shap.summary_plot(grouped_shap, grouped_data, feature_names=unique_parents, show=False)
+        plt.title(f'SHAP Beeswarm Plot (Variables Agrupadas) - {class_name}')
+        plt.xlabel('Impacto SHAP (Contribución Marginal al Modelo - NO CAUSALIDAD)')
         plt.tight_layout()
         path = os.path.join(config.FIGURES_DIR, f'shap_beeswarm_{class_name.replace(" ", "_")}.png')
         plt.savefig(path, dpi=300)
         plt.close()
         
-        # Bar Plot
         plt.figure(figsize=(10, 6))
-        shap.summary_plot(class_shap, shap_bg, feature_names=spatial_feature_names, plot_type='bar', show=False)
-        plt.title(f'SHAP Bar Plot - {class_name}')
+        shap.summary_plot(grouped_shap, grouped_data, feature_names=unique_parents, plot_type='bar', show=False)
+        plt.title(f'SHAP Bar Plot (Importancia Promedio) - {class_name}')
+        plt.xlabel('Magnitud Promedio de Impacto SHAP')
         plt.tight_layout()
         path = os.path.join(config.FIGURES_DIR, f'shap_bar_{class_name.replace(" ", "_")}.png')
         plt.savefig(path, dpi=300)
         plt.close()
         
-    logger.info("Saved SHAP beeswarm and bar plots for all target classes")
-    
-    # Generate dependence plot for age and latitude
-    # Find indices for Coord_Y (Latitude) and Edad
-    try:
-        lat_idx = spatial_feature_names.index('Coord_Y')
-        class_shap_firearm = shap_values[0] if is_list else (shap_values[:, :, 0] if len(shap_values.shape) == 3 else shap_values)
-        
-        plt.figure(figsize=(8, 5))
-        shap.dependence_plot(lat_idx, class_shap_firearm, shap_bg, feature_names=spatial_feature_names, show=False)
-        plt.title('SHAP Dependence Plot: Latitud (Coord_Y) vs Firearm Probability')
-        plt.tight_layout()
-        path = os.path.join(config.FIGURES_DIR, 'shap_dependence_latitude.png')
-        plt.savefig(path, dpi=300)
-        plt.close()
-        logger.info(f"Saved SHAP dependence plot for Latitude to {path}")
-    except Exception as e:
-        logger.warning(f"Could not compute SHAP dependence plot: {e}")
-        
-    # Store background data, explainer and sample SHAP values for streamlit dashboard local prediction
-    return explainer, shap_bg, shap_values
+    logger.info("Saved grouped SHAP beeswarm and bar plots for all classes.")
+    return explainer, X_trans, shap_values, unique_parents

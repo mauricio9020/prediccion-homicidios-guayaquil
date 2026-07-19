@@ -1,0 +1,8 @@
+=== ANÁLISIS DE AUTOCORRELACIÓN ESPACIAL (MORAN'S I GLOBAL) ===
+Unidad de Agregación: Parroquia
+Número de Unidades Espaciales: 57
+Estadístico Moran's I: 0.0807
+Valor Esperado E(I): -0.0179
+Z-Score: 4.4572
+P-Valor: 0.000008
+Conclusión: Existe una autocorrelación espacial positiva altamente significativa (p < 0.05), lo que confirma el agrupamiento geográfico no aleatorio de homicidios en Guayaquil.

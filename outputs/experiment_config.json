@@ -1,0 +1,20 @@
+{
+    "random_state": 123,
+    "best_xgb_params": {
+        "subsample": 0.9,
+        "n_estimators": 50,
+        "max_depth": 3,
+        "learning_rate": 0.1,
+        "colsample_bytree": 1.0
+    },
+    "morans_i": {
+        "morans_i": 0.08073706372005342,
+        "expected_i": -0.017857142857142856,
+        "variance": 0.0004893046968695981,
+        "z_score": 4.45719571290167,
+        "p_value": 8.303878506366047e-06
+    },
+    "best_model": "XGBoost con Covariables Geogr\u00e1ficas",
+    "macro_f1_best": 0.415636500916931,
+    "timestamp": "2026-07-18 20:49:02"
+}
