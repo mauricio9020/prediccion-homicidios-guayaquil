@@ -1,107 +1,149 @@
-=== PRUEBAS DE HIPÓTESIS ESTADÍSTICAS DE MODELOS ===
+=== PRUEBAS DE HIPÓTESIS ESTADÍSTICAS E INTERVALOS DE CONFIANZA ===
 
 --- Baseline Clase Mayoritaria vs Baseline Territorial (Parroquia) ---
+Diferencia Macro F1 (Point): 0.0000
+IC95% de la Diferencia: [0.0000, 0.0000]
 McNemar p-value: 1.000000 (Stat: 0.0000)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 1.0000): Sin diferencia estadísticamente significativa en el conjunto de test. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: 0.0000 (IC95%: [0.0000, 0.0000]). Test de McNemar (p = 1.0000): Sin diferencia significativa en el test. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Clase Mayoritaria vs Regresión Logística Multinomial ---
+Diferencia Macro F1 (Point): -0.0096
+IC95% de la Diferencia: [-0.0333, 0.0185]
 McNemar p-value: 0.000000 (Stat: 365.9505)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0096 (IC95%: [-0.0333, 0.0185]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Clase Mayoritaria vs Random Forest ---
+Diferencia Macro F1 (Point): -0.0710
+IC95% de la Diferencia: [-0.1159, -0.0369]
 McNemar p-value: 0.017960 (Stat: 5.6000)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0180): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0710 (IC95%: [-0.1159, -0.0369]). Test de McNemar (p = 0.0180): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Clase Mayoritaria vs Extra Trees ---
+Diferencia Macro F1 (Point): -0.0827
+IC95% de la Diferencia: [-0.1298, -0.0351]
 McNemar p-value: 0.004179 (Stat: 8.2045)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0042): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0827 (IC95%: [-0.1298, -0.0351]). Test de McNemar (p = 0.0042): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Clase Mayoritaria vs XGBoost Base (No Espacial) ---
+Diferencia Macro F1 (Point): -0.0262
+IC95% de la Diferencia: [-0.0470, -0.0015]
 McNemar p-value: 0.000000 (Stat: 287.3832)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0262 (IC95%: [-0.0470, -0.0015]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Clase Mayoritaria vs XGBoost con Covariables Geográficas ---
+Diferencia Macro F1 (Point): -0.0986
+IC95% de la Diferencia: [-0.1412, -0.0680]
 McNemar p-value: 0.000000 (Stat: 104.4464)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0986 (IC95%: [-0.1412, -0.0680]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Clase Mayoritaria'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Territorial (Parroquia) vs Regresión Logística Multinomial ---
+Diferencia Macro F1 (Point): -0.0096
+IC95% de la Diferencia: [-0.0344, 0.0139]
 McNemar p-value: 0.000000 (Stat: 365.9505)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0096 (IC95%: [-0.0344, 0.0139]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Territorial (Parroquia) vs Random Forest ---
+Diferencia Macro F1 (Point): -0.0710
+IC95% de la Diferencia: [-0.1105, -0.0380]
 McNemar p-value: 0.017960 (Stat: 5.6000)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0180): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0710 (IC95%: [-0.1105, -0.0380]). Test de McNemar (p = 0.0180): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Territorial (Parroquia) vs Extra Trees ---
+Diferencia Macro F1 (Point): -0.0827
+IC95% de la Diferencia: [-0.1328, -0.0361]
 McNemar p-value: 0.004179 (Stat: 8.2045)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0042): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0827 (IC95%: [-0.1328, -0.0361]). Test de McNemar (p = 0.0042): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Territorial (Parroquia) vs XGBoost Base (No Espacial) ---
+Diferencia Macro F1 (Point): -0.0262
+IC95% de la Diferencia: [-0.0545, 0.0013]
 McNemar p-value: 0.000000 (Stat: 287.3832)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0262 (IC95%: [-0.0545, 0.0013]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Baseline Territorial (Parroquia) vs XGBoost con Covariables Geográficas ---
+Diferencia Macro F1 (Point): -0.0986
+IC95% de la Diferencia: [-0.1414, -0.0623]
 McNemar p-value: 0.000000 (Stat: 104.4464)
 Wilcoxon p-value: 1.000000 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon en CV Espacial (p = 1.0000): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0986 (IC95%: [-0.1414, -0.0623]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Baseline Territorial (Parroquia)'. Test de Wilcoxon CV (p = 1.0000): Sin diferencia significativa en CV espacial.
 
 --- Regresión Logística Multinomial vs Random Forest ---
+Diferencia Macro F1 (Point): -0.0614
+IC95% de la Diferencia: [-0.1074, -0.0192]
 McNemar p-value: 0.000000 (Stat: 355.4743)
 Wilcoxon p-value: 0.812500 (Stat: 6.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0614 (IC95%: [-0.1074, -0.0192]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon CV (p = 0.8125): Sin diferencia significativa en CV espacial.
 
 --- Regresión Logística Multinomial vs Extra Trees ---
+Diferencia Macro F1 (Point): -0.0731
+IC95% de la Diferencia: [-0.1302, -0.0247]
 McNemar p-value: 0.000000 (Stat: 349.2893)
 Wilcoxon p-value: 0.812500 (Stat: 6.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0731 (IC95%: [-0.1302, -0.0247]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon CV (p = 0.8125): Sin diferencia significativa en CV espacial.
 
 --- Regresión Logística Multinomial vs XGBoost Base (No Espacial) ---
+Diferencia Macro F1 (Point): -0.0167
+IC95% de la Diferencia: [-0.0364, 0.0018]
 McNemar p-value: 0.000000 (Stat: 32.0158)
 Wilcoxon p-value: 0.625000 (Stat: 5.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'XGBoost Base (No Espacial)'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0167 (IC95%: [-0.0364, 0.0018]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'XGBoost Base (No Espacial)'. Test de Wilcoxon CV (p = 0.6250): Sin diferencia significativa en CV espacial.
 
 --- Regresión Logística Multinomial vs XGBoost con Covariables Geográficas ---
+Diferencia Macro F1 (Point): -0.0891
+IC95% de la Diferencia: [-0.1154, -0.0557]
 McNemar p-value: 0.000000 (Stat: 196.9555)
 Wilcoxon p-value: 0.625000 (Stat: 5.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'XGBoost con Covariables Geográficas'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0891 (IC95%: [-0.1154, -0.0557]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'XGBoost con Covariables Geográficas'. Test de Wilcoxon CV (p = 0.6250): Sin diferencia significativa en CV espacial.
 
 --- Random Forest vs Extra Trees ---
+Diferencia Macro F1 (Point): -0.0117
+IC95% de la Diferencia: [-0.0451, 0.0268]
 McNemar p-value: 0.423711 (Stat: 0.6400)
 Wilcoxon p-value: 0.812500 (Stat: 6.0000)
-Interpretación: Test de McNemar (p = 0.4237): Sin diferencia estadísticamente significativa en el conjunto de test. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0117 (IC95%: [-0.0451, 0.0268]). Test de McNemar (p = 0.4237): Sin diferencia significativa en el test. Test de Wilcoxon CV (p = 0.8125): Sin diferencia significativa en CV espacial.
 
 --- Random Forest vs XGBoost Base (No Espacial) ---
+Diferencia Macro F1 (Point): 0.0447
+IC95% de la Diferencia: [-0.0032, 0.0848]
 McNemar p-value: 0.000000 (Stat: 282.2354)
 Wilcoxon p-value: 0.812500 (Stat: 6.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon en CV Espacial (p = 0.8125): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: 0.0447 (IC95%: [-0.0032, 0.0848]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon CV (p = 0.8125): Sin diferencia significativa en CV espacial.
 
 --- Random Forest vs XGBoost con Covariables Geográficas ---
+Diferencia Macro F1 (Point): -0.0277
+IC95% de la Diferencia: [-0.0855, 0.0376]
 McNemar p-value: 0.000000 (Stat: 89.5541)
 Wilcoxon p-value: 0.437500 (Stat: 4.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon en CV Espacial (p = 0.4375): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0277 (IC95%: [-0.0855, 0.0376]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Random Forest'. Test de Wilcoxon CV (p = 0.4375): Sin diferencia significativa en CV espacial.
 
 --- Extra Trees vs XGBoost Base (No Espacial) ---
+Diferencia Macro F1 (Point): 0.0564
+IC95% de la Diferencia: [0.0107, 0.1029]
 McNemar p-value: 0.000000 (Stat: 270.7338)
 Wilcoxon p-value: 0.625000 (Stat: 5.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: 0.0564 (IC95%: [0.0107, 0.1029]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon CV (p = 0.6250): Sin diferencia significativa en CV espacial.
 
 --- Extra Trees vs XGBoost con Covariables Geográficas ---
+Diferencia Macro F1 (Point): -0.0160
+IC95% de la Diferencia: [-0.0618, 0.0374]
 McNemar p-value: 0.000000 (Stat: 82.2044)
 Wilcoxon p-value: 0.062500 (Stat: 0.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon en CV Espacial (p = 0.0625): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0160 (IC95%: [-0.0618, 0.0374]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'Extra Trees'. Test de Wilcoxon CV (p = 0.0625): Sin diferencia significativa en CV espacial.
 
 --- XGBoost Base (No Espacial) vs XGBoost con Covariables Geográficas ---
+Diferencia Macro F1 (Point): -0.0724
+IC95% de la Diferencia: [-0.1049, -0.0368]
 McNemar p-value: 0.000000 (Stat: 137.5035)
 Wilcoxon p-value: 0.625000 (Stat: 5.0000)
-Interpretación: Test de McNemar (p = 0.0000): Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: 'XGBoost con Covariables Geográficas'. Test de Wilcoxon en CV Espacial (p = 0.6250): Sin diferencia estadísticamente significativa en la validación espacial.
+Interpretación: Diferencia Macro F1: -0.0724 (IC95%: [-0.1049, -0.0368]). Test de McNemar (p = 0.0000): Diferencia significativa en test (p < 0.05). Modelo superior: 'XGBoost con Covariables Geográficas'. Test de Wilcoxon CV (p = 0.6250): Sin diferencia significativa en CV espacial.
 

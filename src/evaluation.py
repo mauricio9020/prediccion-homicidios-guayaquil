@@ -4,11 +4,13 @@ Evaluation, Calibration, Bootstrap & SHAP Interpretability Module for Guayaquil 
 Scientifically Addresses Reviewer Comments:
 - Point #7: Modern Metrics Hierarchy. Macro F1 is the primary evaluation metric, followed by Balanced Accuracy,
   Recall per class, Multiclass MCC, Macro Precision, ROC-AUC, PR-AUC, and Accuracy (secondary only).
-- Point #8: Calibration Curves & Brier Score. Calculates per-class Brier Scores and generates Reliability Diagrams.
+- Point #8: Calibration Curves, Brier Score & ECE. Calculates per-class Brier Scores, Expected Calibration Error (ECE),
+  and generates Reliability Diagrams.
 - Point #9: Correct Bootstrap. Resamples test set (1000 iterations) reporting Mean, Median, Bias, IC95%, and Std Error.
 - Point #10: Grouped SHAP Interpretability. TreeSHAP values are aggregated back into parent categorical variables
-  to eliminate One-Hot dummy clutter. Includes explicit disclaimers against causal misinterpretation.
-- Point #15: Correct Statistical Tests. McNemar test on paired test predictions and Wilcoxon test on spatial CV folds.
+  to eliminate One-Hot dummy clutter. Includes Dependence Plots & explicit disclaimers against causal misinterpretation.
+- Point #15: Correct Statistical Tests. McNemar test on paired test predictions, Wilcoxon test on spatial CV folds,
+  and 95% Confidence Intervals for pairwise model metric differences.
 - Point #17 & #20: Full PEP8, typing, logging, and scientific documentation.
 """
 
@@ -37,6 +39,41 @@ from src import config
 logger = logging.getLogger(__name__)
 
 
+def calculate_ece(y_true_bin: np.ndarray, y_prob_class: np.ndarray, n_bins: int = 10) -> float:
+    """
+    Computes Expected Calibration Error (ECE) for a binary class probability output.
+    ECE measures the average absolute difference between predicted confidence and empirical accuracy.
+    
+    Args:
+        y_true_bin: Binary indicators (0 or 1) for target class.
+        y_prob_class: Predicted probabilities for target class.
+        n_bins: Number of equal-width bins.
+        
+    Returns:
+        float representing Expected Calibration Error (ECE).
+    """
+    bin_boundaries = np.linspace(0, 1, n_bins + 1)
+    ece = 0.0
+    total_samples = len(y_true_bin)
+    
+    for j in range(n_bins):
+        bin_lower = bin_boundaries[j]
+        bin_upper = bin_boundaries[j + 1]
+        
+        # Mask for samples falling in bin j
+        in_bin = (y_prob_class > bin_lower) & (y_prob_class <= bin_upper)
+        if j == 0:
+            in_bin = (y_prob_class >= bin_lower) & (y_prob_class <= bin_upper)
+            
+        bin_size = np.sum(in_bin)
+        if bin_size > 0:
+            avg_confidence = np.mean(y_prob_class[in_bin])
+            avg_accuracy = np.mean(y_true_bin[in_bin])
+            ece += (bin_size / total_samples) * np.abs(avg_confidence - avg_accuracy)
+            
+    return float(ece)
+
+
 def calculate_per_class_metrics(y_true: np.ndarray, y_pred: np.ndarray, label_encoder: Any) -> Dict[str, Any]:
     """
     Computes per-class recall, precision, and F1-score for each homicide mechanism category.
@@ -50,8 +87,6 @@ def calculate_per_class_metrics(y_true: np.ndarray, y_pred: np.ndarray, label_en
         Dict mapping class names to per-class metrics.
     """
     classes = label_encoder.classes_
-    n_classes = len(classes)
-    
     per_class_recall = recall_score(y_true, y_pred, average=None, zero_division=0)
     per_class_precision = precision_score(y_true, y_pred, average=None, zero_division=0)
     per_class_f1 = f1_score(y_true, y_pred, average=None, zero_division=0)
@@ -93,7 +128,6 @@ def get_performance_metrics(
     y_pred = model.predict(X_test)
     pred_time = time.time() - start_pred
     
-    # Predict probabilities (handle estimators that don't output probabilities gracefully)
     if hasattr(model, "predict_proba"):
         y_probs = model.predict_proba(X_test)
     else:
@@ -117,22 +151,18 @@ def get_performance_metrics(
         
     # PR AUC (OvR Macro Average Precision)
     try:
-        # Binarize labels for OvR PR AUC
         y_test_bin = pd.get_dummies(y_test).values
         pr_auc = average_precision_score(y_test_bin, y_probs, average='macro')
     except Exception:
         pr_auc = np.nan
         
-    # Accuracy (Secondary metric only)
     acc = accuracy_score(y_test, y_pred)
     
-    # Log Loss
     try:
         loss = log_loss(y_test, y_probs)
     except Exception:
         loss = np.nan
         
-    # Per-class recall
     per_class = calculate_per_class_metrics(y_test, y_pred, label_encoder)
     
     metrics = {
@@ -150,7 +180,6 @@ def get_performance_metrics(
         'Tiempo Predicción (s)': pred_time
     }
     
-    # Add per-class recall details
     metrics.update(per_class)
     return metrics, y_pred, y_probs
 
@@ -188,9 +217,9 @@ def plot_confusion_matrices(models_predictions: Dict[str, np.ndarray], y_test: n
     logger.info(f"Saved confusion matrices to {path}")
 
 
-def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndarray, label_encoder: Any) -> Dict[str, Dict[str, float]]:
+def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndarray, label_encoder: Any) -> Dict[str, Dict[str, Any]]:
     """
-    Computes per-class Brier Scores and plots Calibration Curves / Reliability Diagrams (Point #8).
+    Computes per-class Brier Scores, Expected Calibration Error (ECE), and plots Calibration Curves / Reliability Diagrams.
     
     Args:
         models_probs: Dict mapping model name to test predicted probability matrix.
@@ -198,9 +227,9 @@ def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndar
         label_encoder: Fitted LabelEncoder.
         
     Returns:
-        Dict mapping model name to per-class Brier Scores.
+        Dict mapping model name to per-class calibration statistics (Brier & ECE).
     """
-    logger.info("Plotting calibration curves and computing Brier Scores...")
+    logger.info("Plotting calibration curves and computing Brier Scores & ECE...")
     classes = label_encoder.classes_
     n_classes = len(classes)
     
@@ -208,7 +237,7 @@ def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndar
     if n_classes == 1:
         axes = [axes]
         
-    brier_scores: Dict[str, Dict[str, float]] = {name: {} for name in models_probs.keys()}
+    calibration_metrics: Dict[str, Dict[str, Any]] = {name: {} for name in models_probs.keys()}
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
     
     for i, c_name in enumerate(classes):
@@ -220,10 +249,13 @@ def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndar
             frac_pos, mean_pred = calibration_curve(y_test_bin, prob_class, n_bins=10)
             
             brier = brier_score_loss(y_test_bin, prob_class)
-            brier_scores[name][c_name] = float(brier)
+            ece = calculate_ece(y_test_bin, prob_class, n_bins=10)
+            
+            calibration_metrics[name][f"{c_name}_Brier"] = float(brier)
+            calibration_metrics[name][f"{c_name}_ECE"] = float(ece)
             
             color = colors[m_idx % len(colors)]
-            axes[i].plot(mean_pred, frac_pos, "s-", color=color, label=f"{name} (Brier={brier:.4f})")
+            axes[i].plot(mean_pred, frac_pos, "s-", color=color, label=f"{name} (Brier={brier:.3f}, ECE={ece:.3f})")
             
         axes[i].set_ylabel("Fracción de Positivos Reales")
         axes[i].set_xlabel("Valor Medio Predicho")
@@ -237,11 +269,10 @@ def plot_calibration_curves(models_probs: Dict[str, np.ndarray], y_test: np.ndar
     plt.savefig(path, dpi=300)
     plt.close()
     
-    # Save Brier Scores to CSV
-    brier_df = pd.DataFrame(brier_scores).T
-    brier_df.to_csv(os.path.join(config.TABLES_DIR, 'brier_scores.csv'))
-    logger.info(f"Saved calibration curves and Brier Scores to {path}")
-    return brier_scores
+    calib_df = pd.DataFrame(calibration_metrics).T
+    calib_df.to_csv(os.path.join(config.TABLES_DIR, 'brier_scores.csv'))
+    logger.info(f"Saved calibration curves, Brier Scores & ECE to {path}")
+    return calibration_metrics
 
 
 def run_bootstrap_validation(
@@ -251,7 +282,7 @@ def run_bootstrap_validation(
     n_iterations: int = 1000
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Performs rigorous Bootstrap Validation (1000 resamples with replacement) on held-out test set (Point #9).
+    Performs Bootstrap Validation (1000 resamples with replacement) on held-out test set (Point #9).
     Reports Mean, Median, Bias (Mean - Point Estimate), 95% Confidence Interval, and Std Error.
     
     Args:
@@ -271,7 +302,6 @@ def run_bootstrap_validation(
     for name, model in models_dict.items():
         X_test = X_test_dict[name]
         
-        # Point estimate on full test set
         point_preds = model.predict(X_test)
         point_f1 = f1_score(y_test, point_preds, average='macro', zero_division=0)
         point_bacc = balanced_accuracy_score(y_test, point_preds)
@@ -331,10 +361,10 @@ def run_mcnemar_test(y_true: np.ndarray, y_pred1: np.ndarray, y_pred2: np.ndarra
     m1_correct = (y_pred1 == y_true)
     m2_correct = (y_pred2 == y_true)
     
-    a = np.sum(m1_correct & m2_correct)   # Both correct
-    b = np.sum(m1_correct & ~m2_correct)  # M1 correct, M2 wrong
-    c = np.sum(~m1_correct & m2_correct)  # M1 wrong, M2 correct
-    d = np.sum(~m1_correct & ~m2_correct) # Both wrong
+    a = np.sum(m1_correct & m2_correct)
+    b = np.sum(m1_correct & ~m2_correct)
+    c = np.sum(~m1_correct & m2_correct)
+    d = np.sum(~m1_correct & ~m2_correct)
     
     if (b + c) > 0:
         stat = (abs(b - c) - 1.0)**2 / (b + c)
@@ -354,22 +384,29 @@ def run_mcnemar_test(y_true: np.ndarray, y_pred1: np.ndarray, y_pred2: np.ndarra
 def compute_statistical_comparisons(
     models_predictions: Dict[str, np.ndarray],
     y_test: np.ndarray,
-    cv_results: Dict[str, Dict[str, Any]]
+    cv_results: Dict[str, Dict[str, Any]],
+    n_bootstrap_diff: int = 200
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Executes McNemar's Test (test set) and Wilcoxon Signed-Rank Test (CV folds) (Point #15).
+    Executes McNemar's Test (test set), Wilcoxon Signed-Rank Test (CV folds),
+    and computes 95% Confidence Intervals for pairwise model metric differences Delta Macro F1 (Point #7 & #15).
     """
-    logger.info("Computing statistical hypothesis tests (McNemar & Wilcoxon)...")
+    logger.info("Computing statistical hypothesis tests & Confidence Intervals for model differences...")
     model_names = list(models_predictions.keys())
     comparisons = {}
+    np.random.seed(config.RANDOM_STATE)
+    n_samples = len(y_test)
     
     for i in range(len(model_names)):
         for j in range(i + 1, len(model_names)):
             m1 = model_names[i]
             m2 = model_names[j]
             
-            # 1. McNemar Test on Test Set
-            mc_res = run_mcnemar_test(y_test, models_predictions[m1], models_predictions[m2])
+            y_pred1 = models_predictions[m1]
+            y_pred2 = models_predictions[m2]
+            
+            # 1. McNemar Test
+            mc_res = run_mcnemar_test(y_test, y_pred1, y_pred2)
             p_mc = mc_res['p_value']
             
             # 2. Wilcoxon Test on Spatial CV Folds
@@ -388,34 +425,53 @@ def compute_statistical_comparisons(
                 p_wx = 1.0
                 wx_stat = 0.0
                 
-            interp = f"Test de McNemar (p = {p_mc:.4f}): "
+            # 3. 95% CI for Difference in Macro F1 (Delta F1 = F1_m1 - F1_m2)
+            f1_m1_point = f1_score(y_test, y_pred1, average='macro', zero_division=0)
+            f1_m2_point = f1_score(y_test, y_pred2, average='macro', zero_division=0)
+            delta_point = f1_m1_point - f1_m2_point
+            
+            diff_boot = np.zeros(n_bootstrap_diff)
+            for b_idx in range(n_bootstrap_diff):
+                idx_res = np.random.choice(n_samples, size=n_samples, replace=True)
+                f1_1_b = f1_score(y_test[idx_res], y_pred1[idx_res], average='macro', zero_division=0)
+                f1_2_b = f1_score(y_test[idx_res], y_pred2[idx_res], average='macro', zero_division=0)
+                diff_boot[b_idx] = f1_1_b - f1_2_b
+                
+            ci_delta_lower = float(np.percentile(diff_boot, 2.5))
+            ci_delta_upper = float(np.percentile(diff_boot, 97.5))
+            
+            interp = f"Diferencia Macro F1: {delta_point:.4f} (IC95%: [{ci_delta_lower:.4f}, {ci_delta_upper:.4f}]). "
+            interp += f"Test de McNemar (p = {p_mc:.4f}): "
             if p_mc < 0.05:
                 better = m1 if mc_res['m1_better'] else m2
-                interp += f"Diferencia estadísticamente significativa en test (p < 0.05). Modelo superior: '{better}'. "
+                interp += f"Diferencia significativa en test (p < 0.05). Modelo superior: '{better}'. "
             else:
-                interp += "Sin diferencia estadísticamente significativa en el conjunto de test. "
+                interp += "Sin diferencia significativa en el test. "
                 
-            interp += f"Test de Wilcoxon en CV Espacial (p = {p_wx:.4f}): "
+            interp += f"Test de Wilcoxon CV (p = {p_wx:.4f}): "
             if p_wx < 0.05:
-                interp += "Diferencia estadísticamente significativa entre folds de CV espacial (p < 0.05)."
+                interp += "Diferencia significativa entre folds espaciales."
             else:
-                interp += "Sin diferencia estadísticamente significativa en la validación espacial."
+                interp += "Sin diferencia significativa en CV espacial."
                 
             pair_key = f"{m1} vs {m2}"
             comparisons[pair_key] = {
+                'delta_macro_f1': float(delta_point),
+                'ci_delta_95': (ci_delta_lower, ci_delta_upper),
                 'mcnemar_p': p_mc,
                 'mcnemar_stat': mc_res['statistic'],
                 'wilcoxon_p': p_wx,
                 'wilcoxon_stat': wx_stat,
                 'interpretation': interp
             }
-            logger.info(f"Comparison '{pair_key}': McNemar p={p_mc:.4f}, Wilcoxon p={p_wx:.4f}")
+            logger.info(f"Comparison '{pair_key}': Delta F1={delta_point:.4f} CI95%=[{ci_delta_lower:.4f}, {ci_delta_upper:.4f}], McNemar p={p_mc:.4f}")
             
-    # Save statistical report
     with open(os.path.join(config.TABLES_DIR, 'statistical_tests.txt'), 'w', encoding='utf-8') as f:
-        f.write("=== PRUEBAS DE HIPÓTESIS ESTADÍSTICAS DE MODELOS ===\n\n")
+        f.write("=== PRUEBAS DE HIPÓTESIS ESTADÍSTICAS E INTERVALOS DE CONFIANZA ===\n\n")
         for pair_key, comp in comparisons.items():
             f.write(f"--- {pair_key} ---\n")
+            f.write(f"Diferencia Macro F1 (Point): {comp['delta_macro_f1']:.4f}\n")
+            f.write(f"IC95% de la Diferencia: [{comp['ci_delta_95'][0]:.4f}, {comp['ci_delta_95'][1]:.4f}]\n")
             f.write(f"McNemar p-value: {comp['mcnemar_p']:.6f} (Stat: {comp['mcnemar_stat']:.4f})\n")
             f.write(f"Wilcoxon p-value: {comp['wilcoxon_p']:.6f} (Stat: {comp['wilcoxon_stat']:.4f})\n")
             f.write(f"Interpretación: {comp['interpretation']}\n\n")
@@ -431,36 +487,24 @@ def compute_grouped_shap_explanations(
     """
     Computes TreeSHAP explanations for XGBoost, aggregating One-Hot dummy features back
     into their parent categorical variables (Point #10).
-    Adds explicit disclaimers: SHAP represents marginal feature attribution, NOT causality.
-    
-    Args:
-        xgb_pipeline: Fitted imblearn Pipeline containing XGBoost classifier.
-        X_train_df: Training DataFrame.
-        label_encoder: Fitted LabelEncoder.
-        
-    Returns:
-        Tuple of (explainer, shap_bg, shap_values, original_feature_names).
+    Adds SHAP Dependence Plot and explicit disclaimers: SHAP represents marginal feature attribution, NOT causality.
     """
     logger.info("Computing grouped SHAP explanations (TreeSHAP)...")
     
-    # Extract fitted classifier & preprocessor from pipeline
     preprocessor = xgb_pipeline.named_steps['preprocessor']
     classifier = xgb_pipeline.named_steps['classifier']
     
-    # Transform background sample of 100 observations
     sample_size = min(100, len(X_train_df))
     np.random.seed(config.RANDOM_STATE)
     sample_df = X_train_df.sample(sample_size, random_state=config.RANDOM_STATE)
     
     X_trans = preprocessor.transform(sample_df)
     
-    # TreeSHAP explainer
     explainer = shap.TreeExplainer(classifier)
     shap_values = explainer.shap_values(X_trans)
     
     classes = label_encoder.classes_
     
-    # Get transformed column feature names
     try:
         cat_cols = [c for c in sample_df.columns if c in config.CAT_COLS]
         num_cols = [c for c in sample_df.columns if c not in cat_cols]
@@ -470,8 +514,6 @@ def compute_grouped_shap_explanations(
     except Exception:
         feature_names = [f"f_{i}" for i in range(X_trans.shape[1])]
         
-    # Group One-Hot dummy SHAP values back to parent variables
-    # Parent mapping: e.g. Tipo_Lugar_VIA_PUBLICA -> Tipo_Lugar
     parent_map = {}
     for fname in feature_names:
         matched = False
@@ -483,16 +525,12 @@ def compute_grouped_shap_explanations(
         if not matched:
             parent_map[fname] = fname
             
-    # Group SHAP matrix
     unique_parents = list(dict.fromkeys(parent_map.values()))
-    
     is_list = isinstance(shap_values, list)
     
-    # Generate grouped beeswarm & bar plots per target class
     for class_idx, class_name in enumerate(classes):
         class_shap = shap_values[class_idx] if is_list else (shap_values[:, :, class_idx] if len(shap_values.shape) == 3 else shap_values)
         
-        # Aggregate SHAP values per parent column
         grouped_shap = np.zeros((sample_size, len(unique_parents)))
         grouped_data = np.zeros((sample_size, len(unique_parents)))
         
@@ -519,5 +557,28 @@ def compute_grouped_shap_explanations(
         plt.savefig(path, dpi=300)
         plt.close()
         
-    logger.info("Saved grouped SHAP beeswarm and bar plots for all classes.")
+    # Generate dependence plot for Coord_Y if present
+    if 'Coord_Y' in unique_parents:
+        try:
+            coord_idx = unique_parents.index('Coord_Y')
+            class0_shap = shap_values[0] if is_list else (shap_values[:, :, 0] if len(shap_values.shape) == 3 else shap_values)
+            grouped_shap0 = np.zeros((sample_size, len(unique_parents)))
+            grouped_data0 = np.zeros((sample_size, len(unique_parents)))
+            for p_idx, parent_col in enumerate(unique_parents):
+                matching_indices = [i for i, fn in enumerate(feature_names) if parent_map[fn] == parent_col]
+                grouped_shap0[:, p_idx] = class0_shap[:, matching_indices].sum(axis=1)
+                grouped_data0[:, p_idx] = X_trans[:, matching_indices].sum(axis=1)
+                
+            plt.figure(figsize=(8, 5))
+            shap.dependence_plot(coord_idx, grouped_shap0, grouped_data0, feature_names=unique_parents, show=False)
+            plt.title('SHAP Dependence Plot: Latitud (Coord_Y) vs Impacto Predicción')
+            plt.tight_layout()
+            path_dep = os.path.join(config.FIGURES_DIR, 'shap_dependence_latitude.png')
+            plt.savefig(path_dep, dpi=300)
+            plt.close()
+            logger.info(f"Saved SHAP dependence plot to {path_dep}")
+        except Exception as e:
+            logger.warning(f"Could not compute SHAP dependence plot: {e}")
+            
+    logger.info("Saved grouped SHAP beeswarm, bar, and dependence plots for all classes.")
     return explainer, X_trans, shap_values, unique_parents

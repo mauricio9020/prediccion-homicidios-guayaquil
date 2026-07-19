@@ -27,7 +27,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, RandomizedSearchCV, cross_validate
-from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score, matthews_corrcoef
+from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score, recall_score, matthews_corrcoef, roc_auc_score, average_precision_score
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler, LabelEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -313,7 +313,8 @@ def run_ablation_study(
 ) -> pd.DataFrame:
     """
     Executes automated Feature Group Ablation Study (Point #5).
-    Evaluates XGBoost performance across cumulative feature sets.
+    Evaluates XGBoost performance across cumulative feature sets, computing Macro F1, Balanced Accuracy,
+    Recall, MCC, ROC-AUC, PR-AUC, and percentage change vs previous step.
     
     Args:
         df: Input clean DataFrame.
@@ -322,7 +323,7 @@ def run_ablation_study(
         xgb_params: Optimized XGBoost hyperparameters.
         
     Returns:
-        pd.DataFrame summarizing ablation results.
+        pd.DataFrame summarizing publication-grade ablation results.
     """
     logger.info("Running automated Ablation Study across cumulative feature groups...")
     ablation_records = []
@@ -330,7 +331,6 @@ def run_ablation_study(
     cv = GroupKFold(n_splits=min(5, len(np.unique(groups))))
     
     for group_name, feature_cols in config.ABLATION_GROUPS.items():
-        # Check which features exist in df
         valid_cols = [c for c in feature_cols if c in df.columns]
         num_cols = [c for c in valid_cols if c in ['Edad', 'Hora', 'Anio_i', 'Mes_i', 'Coord_Y', 'Coord_X']]
         cat_cols = [c for c in valid_cols if c not in num_cols]
@@ -338,34 +338,68 @@ def run_ablation_study(
         X_sub = df[valid_cols].copy()
         pipeline = create_model_pipeline('xgb', num_cols, cat_cols, use_smote=True, hyperparams=xgb_params)
         
-        f1_scores = []
-        bacc_scores = []
-        acc_scores = []
+        f1_scores, bacc_scores, rec_scores, mcc_scores, roc_scores, pr_scores, acc_scores = [], [], [], [], [], [], []
         
         for train_idx, val_idx in cv.split(X_sub, y, groups=groups):
             pipeline.fit(X_sub.iloc[train_idx], y[train_idx])
             preds = pipeline.predict(X_sub.iloc[val_idx])
             
+            if hasattr(pipeline, "predict_proba"):
+                probs = pipeline.predict_proba(X_sub.iloc[val_idx])
+            else:
+                probs = np.zeros((len(val_idx), 3))
+                for i, p in enumerate(preds):
+                    probs[i, p] = 1.0
+                    
             f1_scores.append(f1_score(y[val_idx], preds, average='macro', zero_division=0))
             bacc_scores.append(balanced_accuracy_score(y[val_idx], preds))
+            rec_scores.append(recall_score(y[val_idx], preds, average='macro', zero_division=0))
+            mcc_scores.append(matthews_corrcoef(y[val_idx], preds))
             acc_scores.append(accuracy_score(y[val_idx], preds))
             
-        mean_f1 = np.mean(f1_scores)
-        mean_bacc = np.mean(bacc_scores)
-        mean_acc = np.mean(acc_scores)
+            try:
+                roc_scores.append(roc_auc_score(y[val_idx], probs, multi_class='ovr', average='macro'))
+            except Exception:
+                roc_scores.append(np.nan)
+                
+            try:
+                y_bin = pd.get_dummies(y[val_idx]).values
+                pr_scores.append(average_precision_score(y_bin, probs, average='macro'))
+            except Exception:
+                pr_scores.append(np.nan)
+                
+        mean_f1 = float(np.nanmean(f1_scores))
+        mean_bacc = float(np.nanmean(bacc_scores))
+        mean_rec = float(np.nanmean(rec_scores))
+        mean_mcc = float(np.nanmean(mcc_scores))
+        mean_roc = float(np.nanmean(roc_scores))
+        mean_pr = float(np.nanmean(pr_scores))
+        mean_acc = float(np.nanmean(acc_scores))
         
         ablation_records.append({
             'Grupo_Variables': group_name,
             'Num_Variables': len(valid_cols),
             'Macro F1': mean_f1,
             'Balanced Accuracy': mean_bacc,
+            'Recall (Macro)': mean_rec,
+            'MCC Multiclase': mean_mcc,
+            'ROC-AUC (OvR)': mean_roc,
+            'PR-AUC (OvR)': mean_pr,
             'Accuracy': mean_acc
         })
-        logger.info(f"Ablation Step '{group_name}' -> Macro F1: {mean_f1:.4f}, Bal Acc: {mean_bacc:.4f}")
+        logger.info(f"Ablation Step '{group_name}' -> Macro F1: {mean_f1:.4f}, Bal Acc: {mean_bacc:.4f}, MCC: {mean_mcc:.4f}")
         
     df_ablation = pd.DataFrame(ablation_records)
     
-    # Calculate incremental gain relative to base model
+    # Calculate percentage change vs previous step
+    pct_changes = [0.0]
+    for k in range(1, len(df_ablation)):
+        prev_f1 = df_ablation.iloc[k - 1]['Macro F1']
+        curr_f1 = df_ablation.iloc[k]['Macro F1']
+        pct_inc = ((curr_f1 - prev_f1) / prev_f1 * 100.0) if prev_f1 > 0 else 0.0
+        pct_changes.append(pct_inc)
+        
+    df_ablation['Pct_Incremento_vs_Anterior'] = pct_changes
     base_f1 = df_ablation.iloc[0]['Macro F1']
     df_ablation['Ganancia_F1_vs_Base'] = df_ablation['Macro F1'] - base_f1
     
@@ -373,3 +407,4 @@ def run_ablation_study(
     df_ablation.to_csv(os.path.join(config.TABLES_DIR, 'ablation_study.csv'), index=False)
     logger.info(f"Saved ablation study results to {os.path.join(config.TABLES_DIR, 'ablation_study.csv')}")
     return df_ablation
+
